@@ -1,0 +1,920 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                String                 @id @default(cuid())
+  email             String                 @unique
+  phone             String?                @unique
+  passwordHash      String?
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
+  firstName         String
+  lastName          String?
+  latitude          Float?
+  longitude         Float?
+  payoutMethod      PayoutMethod?
+  payoutAccountHolderName String?
+  payoutBankName    String?
+  payoutAccountNumber String?
+  payoutIfscCode    String?
+  payoutUpiId       String?
+  isActive          Boolean                @default(true)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  roles             UserRole[]
+  createdTurfs      Turf[]
+  ownedTurfs        Turf[]                 @relation("TurfOwner")
+  ownerVerification TurfOwnerVerification?
+  bookings          Booking[]
+  ownedTeams        UserTeam[]             @relation("UserTeamOwner")
+  teamMemberships   UserTeamMember[]
+  hostedOpenMatches OpenMatch[]            @relation("OpenMatchHost")
+  openMatchEntries  OpenMatchParticipant[]
+  notifications     Notification[]
+  hostedTournaments Tournament[]           @relation("TournamentHost")
+  tournamentTeams   TournamentTeam[]       @relation("TournamentTeamOwner")
+  tournamentPlayers TournamentPlayer[]
+  tournamentEntryPayments TournamentEntryPayment[] @relation("TournamentEntryPayer")
+  tournamentPayoutEntries TournamentEntryPayment[] @relation("TournamentPayoutRecipient")
+  tournamentEntryRefunds TournamentEntryPaymentRefund[] @relation("TournamentEntryRefundPayer")
+}
+
+enum OwnerVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model TurfOwnerVerification {
+  id           String                  @id @default(cuid())
+  userId       String                  @unique
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status       OwnerVerificationStatus @default(PENDING)
+  reviewNote   String?
+  reviewedById String?
+  submittedAt  DateTime                @default(now())
+  reviewedAt   DateTime?
+  updatedAt    DateTime                @updatedAt
+
+  @@index([status, submittedAt])
+}
+
+enum TurfStatus {
+  PENDING_REVIEW
+  DOCUMENTS_VERIFIED
+  ACTION_REQUIRED
+  APPROVED
+  REJECTED
+}
+
+enum TurfSlotStatus {
+  AVAILABLE
+  BLOCKED
+  BOOKED
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum BookingPaymentStatus {
+  PAID
+  REFUNDED
+}
+
+enum BookingRefundStatus {
+  CREATED
+  PROCESSED
+  FAILED
+}
+
+enum BookingCancellationActor {
+  USER
+  TURF_OWNER
+  ADMIN
+  SYSTEM
+}
+
+enum TournamentEntryPaymentStatus {
+  PAID
+  REFUNDED
+}
+
+enum PaymentGatewayProvider {
+  RAZORPAY
+}
+
+enum TournamentPayoutTargetType {
+  TURF_OWNER
+  PLATFORM
+}
+
+enum PayoutMethod {
+  BANK_ACCOUNT
+  UPI
+}
+
+enum OpenMatchType {
+  PLAYER_JOIN
+  TEAM_VS_TEAM
+  NEED_OPPONENT_TEAM
+}
+
+enum OpenMatchStatus {
+  OPEN
+  FILLING
+  MIN_READY
+  PAYMENT_PENDING
+  READY
+  FULL
+  CONFIRMED_PARTIAL
+  CONFIRMED_FULL
+  CANCELLED
+  CANCELLED_REFUND
+  COMPLETED
+}
+
+enum OpenMatchResultStatus {
+  PENDING_RESULT
+  CAPTAIN_A_SUBMITTED
+  CAPTAIN_B_SUBMITTED
+  CONFIRMED
+  DISPUTED
+}
+
+enum OpenMatchTeamResultOutcome {
+  WIN
+  DRAW
+  LOSS
+}
+
+enum OpenMatchParticipantKind {
+  PLAYER
+  TEAM
+}
+
+enum OpenMatchPayoutStatus {
+  HELD
+  ELIGIBLE
+  RELEASED
+  REFUND_REQUIRED
+  REFUNDED
+  CANCELLED
+}
+
+enum OpenMatchRefundStatus {
+  CREATED
+  PROCESSED
+  FAILED
+}
+
+enum OpenMatchPayoutReleaseStatus {
+  CREATED
+  QUEUED
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  REVERSED
+  REJECTED
+}
+
+enum OpenMatchParticipantStatus {
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+enum UserTeamMemberRole {
+  CAPTAIN
+  VICE_CAPTAIN
+  PLAYER
+}
+
+enum NotificationType {
+  OPEN_MATCH_NEARBY
+  SYSTEM
+}
+
+enum TournamentStatus {
+  OPEN
+  FULL
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TournamentFixtureType {
+  LEAGUE
+  KNOCKOUT
+  MANUAL
+}
+
+enum TournamentRegistrationOfferMode {
+  GLOBAL
+  CUSTOM
+  DISABLED
+}
+
+enum TournamentTeamStatus {
+  DRAFT
+  JOINED
+  CANCELLED
+}
+
+enum TournamentMatchStatus {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TournamentBattingSide {
+  HOME
+  AWAY
+}
+
+enum TournamentMatchOutcome {
+  NORMAL
+  ABANDONED
+  NO_RESULT
+  RAIN_AFFECTED
+  SUPER_OVER
+}
+
+model Turf {
+  id                 String                 @id @default(cuid())
+  registrationNumber String                 @unique
+  name               String
+  ownerName          String
+  ownerEmail         String
+  ownerPhone         String
+  description        String
+  address            String
+  city               String
+  state              String
+  postalCode         String
+  landmark           String?
+  latitude           Float?
+  longitude          Float?
+  sports             String[]
+  surfaceType        String
+  pricePerHour       Int?
+  openingTime        String
+  closingTime        String
+  amenities          String[]
+  imageUrls          String[]
+  payoutMethod       PayoutMethod?
+  payoutAccountHolderName String?
+  payoutBankName     String?
+  payoutAccountNumber String?
+  payoutIfscCode     String?
+  payoutUpiId        String?
+  bookingCancellationOverrideEnabled Boolean @default(false)
+  bookingCancellationFullRefundHours      Int?
+  bookingCancellationPartialRefundHours   Int?
+  bookingCancellationPartialRefundPercent  Int?
+  bookingCancellationNoRefundHours        Int?
+  openMatchCancellationOverrideEnabled    Boolean @default(false)
+  openMatchCancellationFullRefundHours    Int?
+  openMatchCancellationPartialRefundHours  Int?
+  openMatchCancellationPartialRefundPercent Int?
+  openMatchCancellationNoRefundHours      Int?
+  status             TurfStatus             @default(PENDING_REVIEW)
+  isActive           Boolean                @default(true)
+  documentCount      Int                    @default(0)
+  reviewNote         String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  ownerUserId        String?
+  ownerUser          User?                  @relation("TurfOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  createdById        String
+  createdBy          User                   @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  approvedAt         DateTime?
+  availabilityRules  TurfAvailabilityRule[]
+  slots              TurfSlot[]
+  bookings           Booking[]
+  openMatches        OpenMatch[]
+  tournaments        Tournament[]
+
+  @@index([status, createdAt])
+  @@index([name])
+  @@index([ownerName])
+  @@index([city])
+  @@index([ownerUserId])
+  @@index([ownerEmail])
+  @@index([ownerPhone])
+  @@index([latitude, longitude])
+}
+
+model TurfAvailabilityRule {
+  id           String   @id @default(cuid())
+  turfId       String
+  turf         Turf     @relation(fields: [turfId], references: [id], onDelete: Cascade)
+  dateFrom     DateTime
+  dateTo       DateTime
+  daysOfWeek   Int[]
+  openingTime  String
+  closingTime  String
+  slotMinutes  Int
+  pricePerSlot Int
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([turfId, isActive])
+}
+
+model TurfSlot {
+  id        String         @id @default(cuid())
+  turfId    String
+  turf      Turf           @relation(fields: [turfId], references: [id], onDelete: Cascade)
+  startAt   DateTime
+  endAt     DateTime
+  price     Int
+  status    TurfSlotStatus @default(AVAILABLE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  booking   Booking?
+  openMatch OpenMatch?
+  openMatchSlots OpenMatchSlot[]
+
+  @@unique([turfId, startAt])
+  @@index([turfId, startAt, status])
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  bookingCode String        @unique
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  turfId      String
+  turf        Turf          @relation(fields: [turfId], references: [id], onDelete: Restrict)
+  slotId      String        @unique
+  slot        TurfSlot      @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  status      BookingStatus @default(CONFIRMED)
+  paymentStatus BookingPaymentStatus @default(PAID)
+  paymentProvider PaymentGatewayProvider?
+  paymentOrderId String?    @unique
+  paymentId    String?      @unique
+  paymentSignature String?
+  paymentCapturedAt DateTime?
+  payoutStatus String        @default("PENDING")
+  payoutMethod PayoutMethod?
+  payoutIdempotencyKey String?
+  payoutReference String?
+  razorpayContactId String?
+  razorpayFundAccountId String?
+  razorpayPayoutId String?   @unique
+  payoutReleasedAt DateTime?
+  payoutFailureReason String?
+  refundStatus BookingRefundStatus?
+  refundedAt   DateTime?
+  refundFailureReason String?
+  cancellationReason String?
+  cancelledByRole BookingCancellationActor?
+  price       Int
+  cancelledAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  openMatch   OpenMatch?
+  paymentRefunds BookingPaymentRefund[]
+
+  @@index([userId, createdAt])
+  @@index([turfId, createdAt])
+  @@index([status, createdAt])
+  @@index([payoutStatus, createdAt])
+}
+
+model BookingPaymentRefund {
+  id                String              @id @default(cuid())
+  bookingId         String
+  booking           Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount            Int
+  currency          String              @default("INR")
+  receipt           String              @unique
+  razorpayPaymentId String
+  razorpayRefundId  String?             @unique
+  status            BookingRefundStatus @default(CREATED)
+  failureReason     String?
+  requestedAt       DateTime            @default(now())
+  processedAt       DateTime?
+  failedAt          DateTime?
+
+  @@index([bookingId, requestedAt])
+  @@index([razorpayPaymentId])
+}
+
+model OpenMatch {
+  id                String                 @id @default(cuid())
+  matchCode         String                 @unique
+  hostUserId        String
+  host              User                   @relation("OpenMatchHost", fields: [hostUserId], references: [id], onDelete: Cascade)
+  hostTeamId        String?
+  hostTeam          UserTeam?              @relation("OpenMatchHostTeam", fields: [hostTeamId], references: [id], onDelete: SetNull)
+  turfId            String
+  turf              Turf                   @relation(fields: [turfId], references: [id], onDelete: Restrict)
+  slotId            String                 @unique
+  slot              TurfSlot               @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  bookingId         String                 @unique
+  booking           Booking                @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  title             String
+  sport             String
+  matchType         OpenMatchType
+  status            OpenMatchStatus        @default(OPEN)
+  teamSize          Int
+  minPlayers        Int                    @default(2)
+  maxPlayers        Int
+  spotsFilled       Int                    @default(1)
+  entryFeePerPlayer Int
+  teamEntryFee      Int?
+  sessionStartAt    DateTime?
+  sessionEndAt      DateTime?
+  totalSlotPrice    Int?
+  offlineCollectionAmount Int           @default(0)
+  offlineCollectionConfirmedAt DateTime?
+  offlineCollectionNote String?
+  payoutStatus      OpenMatchPayoutStatus @default(HELD)
+  payoutEligibleAt  DateTime?
+  payoutReleasedAt  DateTime?
+  payoutReference   String?
+  reservedSlotCount Int                    @default(1)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  result            OpenMatchResult?
+  participants      OpenMatchParticipant[]
+  payoutRelease     OpenMatchPayoutRelease?
+  paymentRefunds    OpenMatchPaymentRefund[]
+  reservedSlots     OpenMatchSlot[]
+
+  @@index([status, sport, createdAt])
+  @@index([turfId, createdAt])
+  @@index([hostUserId, createdAt])
+  @@index([hostTeamId, createdAt])
+  @@index([sessionStartAt, sessionEndAt])
+}
+
+model OpenMatchResult {
+  id                    String                   @id @default(cuid())
+  matchId               String                   @unique
+  match                 OpenMatch                @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  status                OpenMatchResultStatus    @default(PENDING_RESULT)
+  confirmedWinnerTeamId String?
+  lastSubmittedByTeamId String?
+  confirmedAt           DateTime?
+  disputedAt            DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  submissions           OpenMatchResultSubmission[]
+
+  @@index([status, updatedAt])
+}
+
+model OpenMatchResultSubmission {
+  id            String                    @id @default(cuid())
+  resultId      String
+  result        OpenMatchResult           @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  teamId        String
+  captainUserId String
+  outcome       OpenMatchTeamResultOutcome
+  note          String?
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+
+  @@unique([resultId, teamId])
+  @@index([teamId, createdAt])
+}
+
+model OpenMatchSlot {
+  id        String    @id @default(cuid())
+  matchId    String
+  match      OpenMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  slotId     String    @unique
+  slot       TurfSlot  @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  position   Int
+  createdAt  DateTime  @default(now())
+
+  @@unique([matchId, slotId])
+  @@index([matchId, position])
+}
+
+model OpenMatchParticipant {
+  id          String                     @id @default(cuid())
+  matchId     String
+  match       OpenMatch                  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userTeamId  String?
+  userTeam    UserTeam?                  @relation("OpenMatchParticipantTeam", fields: [userTeamId], references: [id], onDelete: SetNull)
+  kind        OpenMatchParticipantKind
+  status      OpenMatchParticipantStatus @default(PAID)
+  teamName    String?
+  playerCount Int                        @default(1)
+  selectedMemberIds String[]             @default([])
+  amountPaid  Int
+  paymentProvider PaymentGatewayProvider?
+  paymentOrderId String?                 @unique
+  paymentId    String?                   @unique
+  paymentSignature String?
+  paymentCapturedAt DateTime?
+  refundStatus OpenMatchRefundStatus?
+  refundedAt   DateTime?
+  refundFailureReason String?
+  joinedAt    DateTime                   @default(now())
+  cancelledAt DateTime?
+  refunds     OpenMatchPaymentRefund[]
+
+  @@unique([matchId, userId])
+  @@index([userId, joinedAt])
+  @@index([matchId, status])
+  @@index([userTeamId, joinedAt])
+}
+
+model OpenMatchPaymentRefund {
+  id               String                @id @default(cuid())
+  matchId          String
+  match            OpenMatch             @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  participantId    String
+  participant      OpenMatchParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  amount           Int
+  currency         String                @default("INR")
+  receipt          String                @unique
+  razorpayPaymentId String
+  razorpayRefundId String?               @unique
+  status           OpenMatchRefundStatus @default(CREATED)
+  failureReason    String?
+  requestedAt      DateTime              @default(now())
+  processedAt      DateTime?
+  failedAt         DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([matchId, status, requestedAt])
+  @@index([participantId, status])
+}
+
+model OpenMatchPayoutRelease {
+  id                       String                       @id @default(cuid())
+  matchId                  String                       @unique
+  match                    OpenMatch                    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  amount                   Int
+  currency                 String                       @default("INR")
+  payoutMethod             PayoutMethod
+  idempotencyKey           String                       @unique
+  referenceId              String                       @unique
+  razorpayContactId        String?
+  razorpayFundAccountId    String?
+  razorpayPayoutId         String?                      @unique
+  status                   OpenMatchPayoutReleaseStatus @default(CREATED)
+  failureReason            String?
+  utr                      String?
+  requestedAt              DateTime                     @default(now())
+  processedAt              DateTime?
+  failedAt                 DateTime?
+  reversedAt               DateTime?
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
+
+  @@index([status, requestedAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType @default(SYSTEM)
+  title     String
+  message   String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt, createdAt])
+  @@index([type, createdAt])
+}
+
+model Tournament {
+  id            String              @id @default(cuid())
+  tournamentCode String             @unique
+  hostUserId    String
+  host          User                @relation("TournamentHost", fields: [hostUserId], references: [id], onDelete: Cascade)
+  turfId        String?
+  turf          Turf?               @relation(fields: [turfId], references: [id], onDelete: SetNull)
+  title         String
+  description   String?
+  coverImageUrl String?
+  sport         String
+  status        TournamentStatus    @default(OPEN)
+  fixtureType   TournamentFixtureType @default(LEAGUE)
+  startDate     DateTime?
+  endDate       DateTime?
+  oversPerInnings Int?
+  maxTeams      Int
+  teamSize      Int
+  substituteCount Int             @default(0)
+  entryFeePerTeam Int                @default(0)
+  registrationOfferMode TournamentRegistrationOfferMode @default(GLOBAL)
+  registrationOfferEnabled Boolean?
+  registrationOfferDiscountPercent Int?
+  pointsForWin  Int                 @default(3)
+  pointsForDraw Int                 @default(1)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  teams         TournamentTeam[]
+  matches       TournamentMatch[]
+  standings     TournamentStanding[]
+  entryPayments TournamentEntryPayment[]
+  entryPaymentRefunds TournamentEntryPaymentRefund[]
+
+  @@index([status, sport, createdAt])
+  @@index([hostUserId, createdAt])
+  @@index([turfId, createdAt])
+}
+
+model TournamentRegistrationOfferSetting {
+  id                String   @id
+  isEnabled         Boolean  @default(false)
+  discountPercent   Int      @default(10)
+  updatedAt         DateTime @updatedAt
+}
+
+model BookingPaymentGatewaySetting {
+  id                String                 @id
+  provider          PaymentGatewayProvider @default(RAZORPAY)
+  isEnabled         Boolean                @default(false)
+  razorpayKeyId     String?
+  razorpayKeySecret String?
+  razorpayWebhookSecret String?
+  razorpayXKeyId    String?
+  razorpayXKeySecret String?
+  razorpayXSourceAccountNumber String?
+  autoRefundsEnabled Boolean               @default(false)
+  autoPayoutsEnabled Boolean               @default(false)
+  currency          String                 @default("INR")
+  updatedAt         DateTime               @updatedAt
+}
+
+model CancellationPolicySetting {
+  id                          String  @id
+  bookingFullRefundHours      Int     @default(24)
+  bookingPartialRefundHours    Int     @default(6)
+  bookingPartialRefundPercent  Int     @default(50)
+  bookingNoRefundHours         Int     @default(1)
+  openMatchFullRefundHours     Int     @default(24)
+  openMatchPartialRefundHours  Int     @default(6)
+  openMatchPartialRefundPercent Int     @default(50)
+  openMatchNoRefundHours       Int     @default(1)
+  updatedAt                    DateTime @updatedAt
+}
+
+model TournamentTeam {
+  id           String               @id @default(cuid())
+  tournamentId String
+  tournament   Tournament           @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  ownerUserId  String
+  owner        User                 @relation("TournamentTeamOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  userTeamId   String?
+  userTeam     UserTeam?            @relation(fields: [userTeamId], references: [id], onDelete: SetNull)
+  name         String
+  status       TournamentTeamStatus @default(JOINED)
+  seed         Int?
+  registeredMainPlayerCount Int     @default(0)
+  mainPlayerTarget        Int       @default(0)
+  discountPercentApplied  Int       @default(0)
+  discountAmount          Int       @default(0)
+  finalEntryFee           Int       @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  players      TournamentPlayer[]
+  homeMatches  TournamentMatch[]    @relation("TournamentHomeTeam")
+  awayMatches  TournamentMatch[]    @relation("TournamentAwayTeam")
+  standing     TournamentStanding?
+  entryPayment TournamentEntryPayment?
+
+  @@unique([tournamentId, name])
+  @@index([ownerUserId, createdAt])
+  @@index([userTeamId])
+  @@index([tournamentId, status])
+}
+
+model UserTeam {
+  id               String                 @id @default(cuid())
+  ownerUserId      String
+  owner            User                   @relation("UserTeamOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  name             String
+  logoUrl          String?
+  sport            String?
+  sports           String[]               @default([])
+  isActive         Boolean                @default(true)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  members          UserTeamMember[]
+  hostedOpenMatches OpenMatch[]           @relation("OpenMatchHostTeam")
+  openMatchEntries OpenMatchParticipant[] @relation("OpenMatchParticipantTeam")
+  tournamentTeams  TournamentTeam[]
+
+  @@unique([ownerUserId, name])
+  @@index([ownerUserId, createdAt])
+}
+
+model UserTeamMember {
+  id          String             @id @default(cuid())
+  teamId       String
+  team         UserTeam           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId       String?
+  user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  displayName  String
+  email        String?
+  mobileNumber String?
+  role         UserTeamMemberRole @default(PLAYER)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([teamId, role])
+  @@index([userId])
+}
+
+model TournamentPlayer {
+  id          String         @id @default(cuid())
+  teamId      String
+  team        TournamentTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  displayName String
+  email       String?
+  isSubstitute Boolean       @default(false)
+  jerseyNo    String?
+  position    String?
+  hp          Int            @default(0)
+  totalScore  Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@index([teamId])
+}
+
+model TournamentMatch {
+  id           String                @id @default(cuid())
+  tournamentId String
+  tournament   Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  homeTeamId   String
+  homeTeam     TournamentTeam        @relation("TournamentHomeTeam", fields: [homeTeamId], references: [id], onDelete: Restrict)
+  awayTeamId   String
+  awayTeam     TournamentTeam        @relation("TournamentAwayTeam", fields: [awayTeamId], references: [id], onDelete: Restrict)
+  round        Int
+  scheduledAt  DateTime?
+  status       TournamentMatchStatus @default(SCHEDULED)
+  matchOutcome TournamentMatchOutcome @default(NORMAL)
+  homeScore    Int?
+  awayScore    Int?
+  homeWickets  Int?
+  awayWickets  Int?
+  homeOvers    String?
+  awayOvers    String?
+  battingFirstSide TournamentBattingSide?
+  liveScorecard Json?
+  resultNote   String?
+  completedAt  DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([tournamentId, homeTeamId, awayTeamId])
+  @@index([tournamentId, round])
+  @@index([status, scheduledAt])
+}
+
+model TournamentStanding {
+  id            String         @id @default(cuid())
+  tournamentId  String
+  tournament    Tournament     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamId        String         @unique
+  team          TournamentTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  played        Int            @default(0)
+  wins          Int            @default(0)
+  draws         Int            @default(0)
+  losses        Int            @default(0)
+  points        Int            @default(0)
+  scoreFor      Int            @default(0)
+  scoreAgainst  Int            @default(0)
+  scoreDiff     Int            @default(0)
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([tournamentId, teamId])
+  @@index([tournamentId, points, scoreDiff])
+}
+
+model TournamentEntryPayment {
+  id                    String                       @id @default(cuid())
+  tournamentId          String
+  tournament            Tournament                   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamId                String?                      @unique
+  team                  TournamentTeam?              @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  payerUserId           String
+  payer                 User                         @relation("TournamentEntryPayer", fields: [payerUserId], references: [id], onDelete: Cascade)
+  payoutTargetType      TournamentPayoutTargetType
+  payoutRecipientUserId String?
+  payoutRecipient       User?                        @relation("TournamentPayoutRecipient", fields: [payoutRecipientUserId], references: [id], onDelete: SetNull)
+  status                TournamentEntryPaymentStatus @default(PAID)
+  amount                Int
+  discountAmount        Int                          @default(0)
+  finalEntryFee         Int
+  paymentProvider       PaymentGatewayProvider?
+  paymentOrderId        String?                      @unique
+  paymentId             String?                      @unique
+  paymentSignature      String?
+  paymentCapturedAt     DateTime?
+  payoutStatus          String                       @default("PENDING")
+  payoutMethod          PayoutMethod?
+  payoutReference       String?
+  razorpayContactId     String?
+  razorpayFundAccountId String?
+  razorpayPayoutId      String?
+  payoutReleasedAt      DateTime?
+  payoutFailureReason   String?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+  refunds               TournamentEntryPaymentRefund[]
+
+  @@index([tournamentId, createdAt])
+  @@index([payerUserId, createdAt])
+  @@index([payoutTargetType, payoutStatus])
+  @@index([payoutRecipientUserId, createdAt])
+}
+
+model TournamentEntryPaymentRefund {
+  id                String                 @id @default(cuid())
+  tournamentId      String
+  tournament        Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  entryPaymentId    String
+  entryPayment      TournamentEntryPayment @relation(fields: [entryPaymentId], references: [id], onDelete: Cascade)
+  payerUserId       String
+  payer             User                   @relation("TournamentEntryRefundPayer", fields: [payerUserId], references: [id], onDelete: Cascade)
+  amount            Int
+  currency          String                 @default("INR")
+  receipt           String                 @unique
+  razorpayPaymentId String
+  razorpayRefundId  String?
+  status            BookingRefundStatus    @default(CREATED)
+  failureReason     String?
+  requestedAt       DateTime               @default(now())
+  processedAt       DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([tournamentId, status, requestedAt])
+  @@index([entryPaymentId, status])
+  @@index([payerUserId, requestedAt])
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  description String?
+  roles       RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
