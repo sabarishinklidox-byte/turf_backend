@@ -821,6 +821,100 @@ const sendOpenMatchOwnerEmail = async ({ match, hostUser, paymentSummary = null 
   }
 };
 
+const collectOpenMatchTeamEmails = (team, captainUser = null) => {
+  const emails = new Set();
+  const pushEmail = (value) => {
+    const normalized = value?.trim().toLowerCase();
+    if (normalized) emails.add(normalized);
+  };
+
+  pushEmail(captainUser?.email);
+  for (const member of team?.members ?? []) {
+    pushEmail(member?.email);
+  }
+
+  return [...emails];
+};
+
+const sendOpenMatchResultConfirmedEmail = async (match) => {
+  if (!match?.result || match.result.status !== "CONFIRMED") return;
+
+  const [teamA, teamB] = getOpenMatchResultTeams(match);
+  if (!teamA || !teamB) return;
+
+  const opponentParticipant = (match.participants ?? []).find((participant) => participant.userTeamId === teamB.teamId) ?? null;
+  const winnerTeam =
+    match.result.confirmedWinnerTeamId ? [teamA, teamB].find((team) => team.teamId === match.result.confirmedWinnerTeamId) ?? null : null;
+  const venueLine = [match.turf?.name, match.turf?.city, match.turf?.state].filter(Boolean).join(", ");
+  const startAt = match.sessionStartAt ?? match.slot?.startAt ?? null;
+  const timeLine = startAt ? formatDateTimeForEmail(startAt) : "Start time not set";
+  const link = `${appBaseUrl.replace(/\/$/, "")}/user/bookings`;
+  const resultLine = winnerTeam ? `${winnerTeam.teamName} won` : "The result was confirmed as a draw";
+
+  const teamContexts = [
+    {
+      team: match.hostTeam,
+      teamName: teamA.teamName,
+      captainUser: match.host ?? null,
+    },
+    {
+      team: opponentParticipant?.userTeam ?? null,
+      teamName: teamB.teamName,
+      captainUser: opponentParticipant?.user ?? null,
+    },
+  ].filter((context) => Boolean(context.team));
+
+  for (const context of teamContexts) {
+    const recipients = collectOpenMatchTeamEmails(context.team, context.captainUser);
+    if (!recipients.length) continue;
+
+    const teamWon = winnerTeam ? winnerTeam.teamId === (context.team?.id ?? null) : false;
+    const teamOutcomeLine = winnerTeam
+      ? teamWon
+        ? "Your team has been confirmed as the winner."
+        : "The other team was confirmed as the winner."
+      : "This match ended in a draw.";
+    const subject = `Team result confirmed: ${match.title}`;
+
+    for (const email of recipients) {
+      try {
+        await sendEmail({
+          to: email,
+          subject,
+          text: `Hi ${context.teamName} team,\n\n${teamOutcomeLine}\n\nMatch: ${match.title}\nVenue: ${venueLine || "PlayArena venue"}\nStart: ${timeLine}\nConfirmed result: ${resultLine}\n\nYour community and leaderboard story will update automatically in the app.\n\nOpen bookings:\n${link}\n\n- PlayArena`,
+          html: `
+            <div style="font-family:Arial,sans-serif;color:#10245e;line-height:1.6;">
+              <p style="margin:0 0 8px;">Hi ${escapeHtml(context.teamName)} team,</p>
+              <h2 style="margin:0 0 12px;">Team result confirmed</h2>
+              <div style="margin:0 0 16px;padding:14px 16px;border-radius:16px;background:#f7faff;border:1px solid #dbe7ff;">
+                <div style="font-size:18px;font-weight:800;color:#10245e;">${escapeHtml(match.title)}</div>
+                <div style="margin-top:6px;font-size:14px;color:#5f6f92;">${escapeHtml(venueLine || "PlayArena venue")}</div>
+                <div style="margin-top:4px;font-size:14px;color:#5f6f92;">${escapeHtml(timeLine)}</div>
+              </div>
+              <div style="margin:0 0 18px;padding:14px 16px;border-radius:16px;background:#eef6ff;border:1px solid #bfdbfe;">
+                <div style="font-size:12px;font-weight:900;letter-spacing:0.6px;text-transform:uppercase;color:#1646d8;">Result summary</div>
+                <div style="margin-top:8px;font-size:14px;color:#10245e;">${escapeHtml(teamOutcomeLine)}</div>
+                <div style="margin-top:4px;font-size:14px;color:#10245e;">Confirmed result: ${escapeHtml(resultLine)}</div>
+              </div>
+              <p style="margin:0 0 18px;padding:14px 16px;border-radius:16px;background:#f8fafc;border:1px solid #e2e8f0;color:#475569;">
+                The community section will show the official result and the leaderboard will update automatically from this confirmation.
+              </p>
+              <p style="margin:0 0 18px;">
+                <a href="${link}" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#1646d8;color:#ffffff;text-decoration:none;font-weight:700;">
+                  Open bookings
+                </a>
+              </p>
+              <p style="margin:0;color:#5f6f92;">- PlayArena no-reply</p>
+            </div>
+          `,
+        });
+      } catch (error) {
+        logger.error({ error, matchId: match.id, email }, "Open match result confirmation email failed");
+      }
+    }
+  }
+};
+
 const formatDateTimeForEmail = (value) =>
   new Intl.DateTimeFormat("en-IN", {
     dateStyle: "medium",
@@ -2680,6 +2774,10 @@ export const submitOpenMatchResult = async (userId, matchId, input) => {
       include: openMatchInclude,
     });
   });
+
+  if (updatedMatch?.result?.status === "CONFIRMED") {
+    await sendOpenMatchResultConfirmedEmail(updatedMatch);
+  }
 
   const serializedMatch = serializeOpenMatch(updatedMatch);
   queueOpenMatchAutomation([serializedMatch.id]);
